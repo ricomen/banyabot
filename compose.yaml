@@ -1,0 +1,12 @@
+services:
+  bot:
+    build: .
+    image: instabot:local
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Asia/Almaty}
+      DB_PATH: /data/banya.db
+      FACTS_PATH: /app/facts.json
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
