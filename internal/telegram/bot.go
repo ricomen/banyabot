@@ -1,10 +1,13 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	_ "embed"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,7 +17,11 @@ import (
 	"instabot/internal/banya"
 	"instabot/internal/config"
 	"instabot/internal/db"
+	"instabot/internal/pictures"
 )
+
+//go:embed banya.jpg
+var banyaPhoto []byte
 
 type Bot struct {
 	API    *bot.Bot
@@ -37,6 +44,7 @@ func New(cfg config.Config, store *db.Store, ritual *banya.Ritual) (*Bot, error)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypePrefix, b.onHelp)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/stats", bot.MatchTypePrefix, b.onStats)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/banya", bot.MatchTypePrefix, b.onBanya)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/fact", bot.MatchTypePrefix, b.onFact)
 	return b, nil
 }
 
@@ -47,11 +55,32 @@ func (b *Bot) Start(ctx context.Context) {
 func (b *Bot) defaultHandler(ctx context.Context, api *bot.Bot, update *models.Update) {}
 
 func (b *Bot) SendFact(ctx context.Context, chatID int64, text string) error {
-	_, err := b.API.SendMessage(ctx, &bot.SendMessageParams{
+	photo := b.factPhoto(ctx, text)
+	_, err := b.API.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID: chatID,
-		Text:   text,
+		Photo: &models.InputFileUpload{
+			Filename: photoName(photo),
+			Data:     bytes.NewReader(photo),
+		},
+		Caption: text,
 	})
 	return err
+}
+
+func (b *Bot) factPhoto(ctx context.Context, text string) []byte {
+	img, err := (&pictures.Client{}).Find(ctx, text)
+	if err != nil || len(img) == 0 {
+		slog.Warn("картинка с commons не нашлась", "err", err)
+		return banyaPhoto
+	}
+	return img
+}
+
+func photoName(img []byte) string {
+	if len(img) > 4 && img[0] == 0x89 && img[1] == 'P' {
+		return "banya.png"
+	}
+	return "banya.jpg"
 }
 
 func (b *Bot) SendPoll(ctx context.Context, chatID int64, question string, options []string) (string, int, error) {
@@ -158,6 +187,22 @@ func (b *Bot) onStats(ctx context.Context, api *bot.Bot, update *models.Update) 
 		ChatID: msg.Chat.ID,
 		Text:   formatStats(week.WeekID, votes),
 	})
+}
+
+func (b *Bot) onFact(ctx context.Context, api *bot.Bot, update *models.Update) {
+	msg := update.Message
+	if msg == nil || msg.From == nil {
+		return
+	}
+	if !b.Cfg.IsAdmin(msg.From.ID) || !b.allowedChat(msg.Chat.ID, msg.From) {
+		return
+	}
+	if err := b.Ritual.PostFact(ctx); err != nil {
+		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: msg.Chat.ID,
+			Text:   "Факт не вышел: " + err.Error(),
+		})
+	}
 }
 
 func (b *Bot) onBanya(ctx context.Context, api *bot.Bot, update *models.Update) {

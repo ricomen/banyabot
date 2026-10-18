@@ -9,13 +9,15 @@ import (
 )
 
 type Config struct {
-	BotToken      string
-	BanyaChatID   int64
-	AdminUserIDs  map[int64]struct{}
-	Location      *time.Location
-	CronSpec      string
-	DBPath        string
-	FactsPath     string
+	BotToken     string
+	BanyaChatID  int64
+	AdminUserIDs map[int64]struct{}
+	Location     *time.Location
+	CronSpec     string
+	DBPath       string
+	FactsPath    string
+	GeminiAPIKey string
+	GeminiModel  string
 }
 
 func Load() (Config, error) {
@@ -73,6 +75,8 @@ func Load() (Config, error) {
 		CronSpec:     cronSpec,
 		DBPath:       dbPath,
 		FactsPath:    strings.TrimSpace(os.Getenv("FACTS_PATH")),
+		GeminiAPIKey: strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
+		GeminiModel:  strings.TrimSpace(os.Getenv("GEMINI_MODEL")),
 	}, nil
 }
 

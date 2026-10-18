@@ -21,3 +21,9 @@ CREATE TABLE IF NOT EXISTS facts_used (
   fact_id     INTEGER PRIMARY KEY,
   used_at     TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS sent_facts (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  text    TEXT NOT NULL,
+  used_at TEXT NOT NULL
+);

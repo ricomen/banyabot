@@ -12,6 +12,7 @@ import (
 	"instabot/internal/banya"
 	"instabot/internal/config"
 	"instabot/internal/db"
+	"instabot/internal/gemini"
 	"instabot/internal/scheduler"
 	"instabot/internal/telegram"
 )
@@ -44,6 +45,10 @@ func main() {
 		Loc:    cfg.Location,
 		Facts:  facts,
 		RNG:    rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+	if cfg.GeminiAPIKey != "" {
+		ritual.Source = &gemini.Client{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiModel}
+		slog.Info("факты из gemini", "model", cfg.GeminiModel)
 	}
 
 	tg, err := telegram.New(cfg, store, ritual)

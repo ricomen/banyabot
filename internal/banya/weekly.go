@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"time"
 
@@ -16,6 +17,10 @@ type PollSender interface {
 	SendPoll(ctx context.Context, chatID int64, question string, options []string) (pollID string, messageID int, err error)
 }
 
+type FactSource interface {
+	Fact(ctx context.Context, recent []string) (string, error)
+}
+
 type Ritual struct {
 	Store  *db.Store
 	ChatID int64
@@ -23,6 +28,7 @@ type Ritual struct {
 	Facts  []Fact
 	RNG    *rand.Rand
 	Sender PollSender
+	Source FactSource
 }
 
 var ErrAlreadyPosted = errors.New("poll already posted for this week")
@@ -39,18 +45,12 @@ func (r *Ritual) Run(ctx context.Context) error {
 		return err
 	}
 
-	used, err := r.Store.UsedFactIDs()
+	text, factID, err := r.nextFact(ctx)
 	if err != nil {
 		return err
 	}
-	fact := PickFact(r.Facts, used, r.RNG)
-	if len(used) >= len(r.Facts) {
-		if err := r.Store.ClearFactsUsed(); err != nil {
-			return err
-		}
-	}
 
-	if err := r.Sender.SendFact(ctx, r.ChatID, WrapFact(fact.Text)); err != nil {
+	if err := r.Sender.SendFact(ctx, r.ChatID, text); err != nil {
 		return fmt.Errorf("send fact: %w", err)
 	}
 
@@ -68,5 +68,56 @@ func (r *Ritual) Run(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
-	return r.Store.MarkFactUsed(fact.ID, now.Format(time.RFC3339))
+	usedAt := now.Format(time.RFC3339)
+	if err := r.Store.SaveSentFact(text, usedAt); err != nil {
+		return err
+	}
+	if factID == 0 {
+		return nil
+	}
+	return r.Store.MarkFactUsed(factID, usedAt)
+}
+
+func (r *Ritual) PostFact(ctx context.Context) error {
+	text, factID, err := r.nextFact(ctx)
+	if err != nil {
+		return err
+	}
+	if err := r.Sender.SendFact(ctx, r.ChatID, text); err != nil {
+		return fmt.Errorf("send fact: %w", err)
+	}
+	usedAt := time.Now().In(r.Loc).Format(time.RFC3339)
+	if err := r.Store.SaveSentFact(text, usedAt); err != nil {
+		return err
+	}
+	if factID == 0 {
+		return nil
+	}
+	return r.Store.MarkFactUsed(factID, usedAt)
+}
+
+func (r *Ritual) nextFact(ctx context.Context) (string, int, error) {
+	if r.Source != nil {
+		recent, err := r.Store.RecentFactTexts(12)
+		if err != nil {
+			return "", 0, err
+		}
+		text, err := r.Source.Fact(ctx, recent)
+		if err == nil && text != "" {
+			return text, 0, nil
+		}
+		slog.Warn("gemini fact failed, using facts.json", "err", err)
+	}
+
+	used, err := r.Store.UsedFactIDs()
+	if err != nil {
+		return "", 0, err
+	}
+	fact := PickFact(r.Facts, used, r.RNG)
+	if len(used) >= len(r.Facts) {
+		if err := r.Store.ClearFactsUsed(); err != nil {
+			return "", 0, err
+		}
+	}
+	return fact.Text, fact.ID, nil
 }

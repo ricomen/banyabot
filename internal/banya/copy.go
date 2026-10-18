@@ -19,10 +19,6 @@ func OptionText(id int) string {
 	return opts[id]
 }
 
-func WrapFact(text string) string {
-	return "Баньщик шипит:\n\n" + text + "\n\nКто не идёт — тот сам себя веником не гладит."
-}
-
 func PollQuestion() string {
 	return "Кто идёт париться на этой неделе, а кто трусит?"
 }
@@ -32,7 +28,8 @@ func HelpText() string {
 		"По вторникам кидаю факт и опрос: Иду / Не иду.\n\n" +
 		"/stats — кто как ответил на этой неделе\n" +
 		"/stats last — прошлая неделя\n" +
-		"/banya — админский повтор ритуала"
+		"/banya — админский повтор ритуала\n" +
+		"/fact — админский факт без опроса"
 }
 
 func AlreadyPosted(weekID string) string {
