@@ -1,7 +1,7 @@
 services:
   bot:
     build: .
-    image: instabot:local
+    image: banyabot:local
     env_file: .env
     environment:
       TZ: ${TZ:-Asia/Almaty}

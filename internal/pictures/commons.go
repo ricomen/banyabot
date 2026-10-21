@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const userAgent = "instabot/1.0 (telegram banya facts; educational)"
+const userAgent = "banyabot/1.0 (telegram banya facts; educational)"
 
 type Client struct {
 	HTTP *http.Client

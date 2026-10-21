@@ -9,7 +9,7 @@ import (
 	"math/rand"
 	"time"
 
-	"instabot/internal/db"
+	"banyabot/internal/db"
 )
 
 type PollSender interface {

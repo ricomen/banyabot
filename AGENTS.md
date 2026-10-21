@@ -7,7 +7,7 @@ Telegram-бот «злобный баньщик»: один Go-бинарник,
 - `cmd/bot/main.go` — вся сборка приложения: конфиг → SQLite → факты → Telegram → cron.
 - `internal/banya` — доменная логика (недельный ритуал, напоминание, выбор факта, тексты).
 - `internal/db` — SQLite-хранилище; `internal/telegram` — API и обработчики; `internal/scheduler` — cron; `internal/gemini` — LLM-факты; `internal/pictures` — картинки из Wikimedia Commons.
-- Модуль называется `instabot`, импорты вида `instabot/internal/...` (не github-путь).
+- Модуль называется `banyabot`, импорты вида `banyabot/internal/...` (не github-путь).
 
 ## Commands
 
@@ -15,13 +15,13 @@ Telegram-бот «злобный баньщик»: один Go-бинарник,
 go test ./...                                  # быстрый и достаточный прогон
 go test ./internal/banya -run TestName -v      # один тест
 go vet ./...
-make build                                     # -> bin/instabot (gitignored)
+make build                                     # -> bin/banyabot (gitignored)
 ```
 
 Локальный запуск без Docker: приложение **не читает `.env` само**:
 
 ```bash
-export $(grep -v '^#' .env | xargs) && ./bin/instabot
+export $(grep -v '^#' .env | xargs) && ./bin/banyabot
 ```
 
 Docker: `docker compose up -d --build`.

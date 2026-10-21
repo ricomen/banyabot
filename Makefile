@@ -1,7 +1,7 @@
 .PHONY: test build build-linux-amd64 build-linux-arm64 build-linux-armv7 docker docker-arm64
 
 MODULE=./cmd/bot
-BIN=bin/instabot
+BIN=bin/banyabot
 
 test:
 	go test ./...
@@ -22,4 +22,4 @@ docker:
 	docker compose build
 
 docker-arm64:
-	docker buildx build --platform linux/arm64 -t instabot:arm64 --load .
+	docker buildx build --platform linux/arm64 -t banyabot:arm64 --load .

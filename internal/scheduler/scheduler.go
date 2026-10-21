@@ -7,8 +7,8 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"instabot/internal/banya"
-	"instabot/internal/config"
+	"banyabot/internal/banya"
+	"banyabot/internal/config"
 )
 
 type Runner struct {

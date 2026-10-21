@@ -1,4 +1,4 @@
-# instabot — злобный баньщик
+# banyabot — бот банщик
 
 Telegram-бот для группы: **по вторникам в 18:00 (Asia/Almaty)** шлёт факт про баню и неанонимный опрос «Иду / Не иду», пишет голоса в SQLite.
 
@@ -8,17 +8,17 @@ Telegram-бот для группы: **по вторникам в 18:00 (Asia/Al
 
 Workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
-- на PR и push: `go test ./...` и кросс-сборка `linux/amd64`, `linux/arm64`, `linux/armv7` (артефакт `instabot-linux`)
+- на PR и push: `go test ./...` и кросс-сборка `linux/amd64`, `linux/arm64`, `linux/armv7` (артефакт `banyabot-linux`)
 - на push в `main`/`master` (не на PR): multi-arch Docker (`linux/amd64,linux/arm64`) в **GHCR**: `ghcr.io/<owner>/<repo>`
 
 Пакеты репозитория должны быть **public** или Pi логинится в GHCR. Пример на малинке:
 
 ```bash
 echo "$GHCR_TOKEN" | docker login ghcr.io -u USER --password-stdin
-docker pull ghcr.io/OWNER/instabot:latest
+docker pull ghcr.io/OWNER/banyabot:latest
 ```
 
-В `compose.yaml` можно заменить `build: .` на `image: ghcr.io/OWNER/instabot:latest`.
+В `compose.yaml` можно заменить `build: .` на `image: ghcr.io/OWNER/banyabot:latest`.
 
 ## Команды
 
@@ -59,10 +59,10 @@ docker compose logs -f
 make test
 make build
 export $(grep -v '^#' .env | xargs)
-./bin/instabot
+./bin/banyabot
 ```
 
-systemd: скопируйте бинарник, [deploy/instabot.service](deploy/instabot.service) и `/etc/instabot/env` (как `.env`).
+systemd: скопируйте бинарник, [deploy/banyabot.service](deploy/banyabot.service) и `/etc/banyabot/env` (как `.env`).
 
 ## Запуск: Raspberry Pi (arm64)
 
@@ -73,14 +73,14 @@ systemd: скопируйте бинарник, [deploy/instabot.service](deploy
 ```bash
 make docker-arm64
 # или: ./scripts/docker-buildx.sh --push   # нужен registry и IMAGE=...
-docker save instabot:arm64 | ssh pi@host docker load
+docker save banyabot:arm64 | ssh pi@host docker load
 ```
 
 Нативный бинарник:
 
 ```bash
 make build-linux-arm64
-scp bin/instabot-linux-arm64 pi@host:/usr/local/bin/instabot
+scp bin/banyabot-linux-arm64 pi@host:/usr/local/bin/banyabot
 ```
 
 Для 32-bit Pi OS: `make build-linux-armv7`.

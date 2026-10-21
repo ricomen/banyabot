@@ -1,14 +1,14 @@
 [Unit]
-Description=Instabot banya Telegram bot
+Description=Banya bot Telegram bot
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=instabot
-WorkingDirectory=/opt/instabot
-EnvironmentFile=/etc/instabot/env
-ExecStart=/usr/local/bin/instabot
+User=banyabot
+WorkingDirectory=/opt/banyabot
+EnvironmentFile=/etc/banyabot/env
+ExecStart=/usr/local/bin/banyabot
 Restart=on-failure
 RestartSec=10
 

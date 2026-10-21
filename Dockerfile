@@ -7,19 +7,19 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -trimpath -ldflags="-s -w" -o /out/instabot ./cmd/bot
+    go build -trimpath -ldflags="-s -w" -o /out/banyabot ./cmd/bot
 
 FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --home /data instabot
+    && useradd --system --uid 10001 --home /data banyabot
 WORKDIR /app
-COPY --from=build /out/instabot /app/instabot
+COPY --from=build /out/banyabot /app/banyabot
 COPY facts.json /app/facts.json
-USER instabot
+USER banyabot
 VOLUME ["/data"]
 ENV DB_PATH=/data/banya.db \
     TZ=Asia/Almaty \
     FACTS_PATH=/app/facts.json
-ENTRYPOINT ["/app/instabot"]
+ENTRYPOINT ["/app/banyabot"]

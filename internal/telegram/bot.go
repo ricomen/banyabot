@@ -15,10 +15,10 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"instabot/internal/banya"
-	"instabot/internal/config"
-	"instabot/internal/db"
-	"instabot/internal/pictures"
+	"banyabot/internal/banya"
+	"banyabot/internal/config"
+	"banyabot/internal/db"
+	"banyabot/internal/pictures"
 )
 
 //go:embed banya.jpg

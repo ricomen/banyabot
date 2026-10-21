@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"instabot/internal/db"
+	"banyabot/internal/db"
 )
 
 type fakeSender struct {

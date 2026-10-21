@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"instabot/internal/banya"
-	"instabot/internal/config"
-	"instabot/internal/db"
-	"instabot/internal/gemini"
-	"instabot/internal/scheduler"
-	"instabot/internal/telegram"
+	"banyabot/internal/banya"
+	"banyabot/internal/config"
+	"banyabot/internal/db"
+	"banyabot/internal/gemini"
+	"banyabot/internal/scheduler"
+	"banyabot/internal/telegram"
 )
 
 func main() {

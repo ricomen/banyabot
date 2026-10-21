@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"instabot/migrations"
+	"banyabot/migrations"
 
 	_ "modernc.org/sqlite"
 )

@@ -31,8 +31,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: instabot-linux
-          path: bin/instabot-linux-*
+          name: banyabot-linux
+          path: bin/banyabot-linux-*
           if-no-files-found: error
 
   docker:
