@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,6 +82,30 @@ func (s *Store) InsertWeek(w Week) error {
 		w.WeekID, w.ChatID, w.PollID, w.MessageID, w.CreatedAt,
 	)
 	return err
+}
+
+func (s *Store) WeeksQuietSince(cutoff string) ([]Week, error) {
+	rows, err := s.SQL.Query(
+		`SELECT w.week_id, w.chat_id, w.poll_id, w.message_id, w.created_at
+		 FROM weeks w
+		 WHERE w.created_at <= ?
+		   AND NOT EXISTS (SELECT 1 FROM votes v WHERE v.week_id = w.week_id)
+		   AND NOT EXISTS (SELECT 1 FROM settings s WHERE s.key = 'nagged:' || w.week_id)`,
+		cutoff,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Week
+	for rows.Next() {
+		var w Week
+		if err := rows.Scan(&w.WeekID, &w.ChatID, &w.PollID, &w.MessageID, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, w)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) GetWeek(weekID string, chatID int64) (Week, error) {
@@ -210,5 +235,26 @@ func (s *Store) RecentFactTexts(limit int) ([]string, error) {
 
 func (s *Store) SaveSentFact(text, usedAt string) error {
 	_, err := s.SQL.Exec(`INSERT INTO sent_facts (text, used_at) VALUES (?, ?)`, text, usedAt)
+	return err
+}
+
+func (s *Store) Setting(key string) (string, bool, error) {
+	var value string
+	err := s.SQL.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return value, true, nil
+}
+
+func (s *Store) SetSetting(key, value string) error {
+	_, err := s.SQL.Exec(
+		`INSERT INTO settings (key, value) VALUES (?, ?)
+		 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+		key, value,
+	)
 	return err
 }

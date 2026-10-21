@@ -15,10 +15,15 @@ import (
 type PollSender interface {
 	SendFact(ctx context.Context, chatID int64, text string) error
 	SendPoll(ctx context.Context, chatID int64, question string, options []string) (pollID string, messageID int, err error)
+	SendText(ctx context.Context, chatID int64, text string) error
 }
 
 type FactSource interface {
 	Fact(ctx context.Context, recent []string) (string, error)
+}
+
+type Taunter interface {
+	Taunt(ctx context.Context) (string, error)
 }
 
 type Ritual struct {
@@ -29,6 +34,7 @@ type Ritual struct {
 	RNG    *rand.Rand
 	Sender PollSender
 	Source FactSource
+	Taunt  Taunter
 }
 
 var ErrAlreadyPosted = errors.New("poll already posted for this week")
@@ -76,6 +82,34 @@ func (r *Ritual) Run(ctx context.Context) error {
 		return nil
 	}
 	return r.Store.MarkFactUsed(factID, usedAt)
+}
+
+func (r *Ritual) Remind(ctx context.Context) error {
+	if r.Loc == nil {
+		r.Loc = time.UTC
+	}
+	cutoff := time.Now().In(r.Loc).Add(-24 * time.Hour).Format(time.RFC3339)
+	weeks, err := r.Store.WeeksQuietSince(cutoff)
+	if err != nil {
+		return err
+	}
+	for _, week := range weeks {
+		text := NobodyVoted()
+		if r.Taunt != nil {
+			if line, err := r.Taunt.Taunt(ctx); err == nil && line != "" {
+				text = line
+			} else if err != nil {
+				slog.Warn("gemini taunt failed", "err", err)
+			}
+		}
+		if err := r.Sender.SendText(ctx, week.ChatID, text); err != nil {
+			return err
+		}
+		if err := r.Store.SetSetting("nagged:"+week.WeekID, cutoff); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Ritual) PostFact(ctx context.Context) error {

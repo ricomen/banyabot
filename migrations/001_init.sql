@@ -27,3 +27,8 @@ CREATE TABLE IF NOT EXISTS sent_facts (
   text    TEXT NOT NULL,
   used_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

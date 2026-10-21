@@ -13,10 +13,16 @@ import (
 type fakeSender struct {
 	facts int
 	polls int
+	texts []string
 }
 
 func (f *fakeSender) SendFact(ctx context.Context, chatID int64, text string) error {
 	f.facts++
+	return nil
+}
+
+func (f *fakeSender) SendText(ctx context.Context, chatID int64, text string) error {
+	f.texts = append(f.texts, text)
 	return nil
 }
 
@@ -121,3 +127,35 @@ func TestPostFactDoesNotOpenPoll(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRemindShamesEmptyPoll(t *testing.T) {
+	store, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	old := time.Now().UTC().Add(-25 * time.Hour).Format(time.RFC3339)
+	if err := store.InsertWeek(db.Week{
+		WeekID: "2026-W01", ChatID: -100, PollID: "p", MessageID: 1, CreatedAt: old,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sender := &fakeSender{}
+	r := &Ritual{Store: store, Loc: time.UTC, Sender: sender, Taunt: stubTaunt{text: "молчуны"}}
+	if err := r.Remind(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(sender.texts) != 1 || sender.texts[0] != "молчуны" {
+		t.Fatalf("%v", sender.texts)
+	}
+	if err := r.Remind(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(sender.texts) != 1 {
+		t.Fatalf("reminded twice: %v", sender.texts)
+	}
+}
+
+type stubTaunt struct{ text string }
+
+func (s stubTaunt) Taunt(ctx context.Context) (string, error) { return s.text, nil }

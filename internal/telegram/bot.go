@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -24,10 +25,13 @@ import (
 var banyaPhoto []byte
 
 type Bot struct {
-	API    *bot.Bot
-	Cfg    config.Config
-	Store  *db.Store
-	Ritual *banya.Ritual
+	API     *bot.Bot
+	Cfg     config.Config
+	Store   *db.Store
+	Ritual  *banya.Ritual
+	Sched   Rescheduler
+	pending map[int64]string
+	pendMu  sync.Mutex
 }
 
 func New(cfg config.Config, store *db.Store, ritual *banya.Ritual) (*Bot, error) {
@@ -45,6 +49,8 @@ func New(cfg config.Config, store *db.Store, ritual *banya.Ritual) (*Bot, error)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/stats", bot.MatchTypePrefix, b.onStats)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/banya", bot.MatchTypePrefix, b.onBanya)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/fact", bot.MatchTypePrefix, b.onFact)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, b.onStart)
+	api.RegisterHandler(bot.HandlerTypeCallbackQueryData, "setup:", bot.MatchTypePrefix, b.onSetupCallback)
 	return b, nil
 }
 
@@ -52,7 +58,12 @@ func (b *Bot) Start(ctx context.Context) {
 	b.API.Start(ctx)
 }
 
-func (b *Bot) defaultHandler(ctx context.Context, api *bot.Bot, update *models.Update) {}
+func (b *Bot) defaultHandler(ctx context.Context, api *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+		return
+	}
+	b.handleSetupText(ctx, api, update.Message)
+}
 
 func (b *Bot) SendFact(ctx context.Context, chatID int64, text string) error {
 	photo := b.factPhoto(ctx, text)
@@ -81,6 +92,14 @@ func photoName(img []byte) string {
 		return "banya.png"
 	}
 	return "banya.jpg"
+}
+
+func (b *Bot) SendText(ctx context.Context, chatID int64, text string) error {
+	_, err := b.API.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: chatID,
+		Text:   text,
+	})
+	return err
 }
 
 func (b *Bot) SendPoll(ctx context.Context, chatID int64, question string, options []string) (string, int, error) {

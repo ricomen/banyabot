@@ -36,19 +36,35 @@ func (c *Client) httpClient() *http.Client {
 }
 
 func (c *Client) Fact(ctx context.Context, recent []string) (string, error) {
-	if c.APIKey == "" {
-		return "", fmt.Errorf("gemini api key is empty")
-	}
 	user := "Дай один новый факт про русскую баню."
 	if len(recent) > 0 {
 		user += " Не повторяй уже отправленное:\n- " + strings.Join(recent, "\n- ")
 	}
-	body, err := json.Marshal(map[string]any{
-		"model": c.model(),
-		"system_instruction": "Пишешь один короткий факт про русскую баню для Telegram. " +
-			"Одно или два предложения, разговорный тон злобного баньщика. " +
+	return c.generate(ctx,
+		"Пишешь один короткий факт про русскую баню для Telegram. "+
+			"Одно или два предложения, разговорный тон злобного баньщика. "+
 			"Без списков, заголовков и ссылок. Не выдумывай точные цифры.",
-		"input": user,
+		user,
+	)
+}
+
+func (c *Client) Taunt(ctx context.Context) (string, error) {
+	return c.generate(ctx,
+		"Пишешь одну короткую саркастическую фразу для Telegram-чата бани. "+
+			"Сутки прошли, в опросе «Иду / Не иду» ноль голосов. "+
+			"Одно или два предложения, без списков и без имён.",
+		"Постыди тех, кто промолчал.",
+	)
+}
+
+func (c *Client) generate(ctx context.Context, system, user string) (string, error) {
+	if c.APIKey == "" {
+		return "", fmt.Errorf("gemini api key is empty")
+	}
+	body, err := json.Marshal(map[string]any{
+		"model":              c.model(),
+		"system_instruction": system,
+		"input":              user,
 	})
 	if err != nil {
 		return "", err
