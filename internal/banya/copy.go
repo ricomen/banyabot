@@ -3,6 +3,7 @@ package banya
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -27,35 +28,69 @@ func NobodyVoted() string {
 }
 
 func DirtyList(names []string) string {
+	return ShameText("", names)
+}
+
+func ShameText(caption string, names []string) string {
 	var b strings.Builder
-	b.WriteString("Вот эти грязнули на этой неделе не ходили в баню, помогу им отмыться:\n")
-	for _, name := range names {
-		b.WriteString("— ")
-		b.WriteString(name)
-		b.WriteString("\n")
+	caption = strings.TrimSpace(caption)
+	if caption == "" {
+		b.WriteString("Вот эти грязнули на этой неделе не ходили в баню, помогу им отмыться:")
+	} else {
+		b.WriteString(caption)
 	}
-	return strings.TrimRight(b.String(), "\n")
+	for _, name := range names {
+		b.WriteString("\n— ")
+		b.WriteString(name)
+	}
+	return b.String()
 }
 
 func PollQuestion() string {
-	return "Кто идёт париться на этой неделе, а кто трусит?"
+	return "ЗаеБанька на этой неделе?"
 }
 
 func HelpText() string {
-	return "Я злобный баньщик.\n" +
+	return "Я банщик.\n" +
 		"По вторникам кидаю факт и опрос: Иду / Не иду.\n\n" +
 		"/stats — кто как ответил на этой неделе\n" +
 		"/stats last — прошлая неделя\n" +
-		"/gryaznuli — админская проверка: гиф и кто не голосовал\n" +
+		"/gryaznuli — «Грязнули»\n" +
 		"/banya — админский повтор ритуала\n" +
 		"/fact — админский факт без опроса\n" +
 		"/start — настройки в личке админа"
 }
 
 func AlreadyPosted(weekID string) string {
-	return fmt.Sprintf("На неделю %s опрос уже висит. Не жадничай.", weekID)
+	return "Опрос на " + WeekLabel(weekID) + " уже висит. Не жадничай."
 }
 
 func StatsHeader(weekID string) string {
-	return fmt.Sprintf("Неделя %s. Баньщик считает головы:\n", weekID)
+	return WeekLabel(weekID) + ". Баньщик считает головы:\n"
+}
+
+func WeekLabel(weekID string) string {
+	var year, week int
+	if _, err := fmt.Sscanf(weekID, "%d-W%d", &year, &week); err != nil || week < 1 || week > 53 {
+		return weekID
+	}
+	jan4 := time.Date(year, time.January, 4, 0, 0, 0, 0, time.UTC)
+	wd := int(jan4.Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	start := jan4.AddDate(0, 0, -(wd-1)+(week-1)*7)
+	end := start.AddDate(0, 0, 6)
+	return fmt.Sprintf("%d %s — %d %s", start.Day(), monthGenitive(start.Month()), end.Day(), monthGenitive(end.Month()))
+}
+
+func monthGenitive(m time.Month) string {
+	names := [...]string{
+		"", "января", "февраля", "марта", "апреля", "мая", "июня",
+		"июля", "августа", "сентября", "октября", "ноября", "декабря",
+	}
+	if m < time.January || m > time.December {
+		return ""
+	}
+	return names[m]
 }

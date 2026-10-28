@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"strings"
 	"time"
 
 	"banyabot/internal/db"
@@ -16,7 +17,7 @@ type PollSender interface {
 	SendFact(ctx context.Context, chatID int64, text string) error
 	SendPoll(ctx context.Context, chatID int64, question string, options []string) (pollID string, messageID int, err error)
 	SendText(ctx context.Context, chatID int64, text string) error
-	SendShame(ctx context.Context, chatID int64, text string) error
+	SendShame(ctx context.Context, chatID int64, fileID, text string) error
 }
 
 type FactSource interface {
@@ -36,6 +37,8 @@ type Ritual struct {
 	Sender PollSender
 	Source FactSource
 	Taunt  Taunter
+	// OnPosted ставит напоминание через сутки после опроса.
+	OnPosted func(at time.Time)
 }
 
 var ErrAlreadyPosted = errors.New("poll already posted for this week")
@@ -61,7 +64,7 @@ func (r *Ritual) Run(ctx context.Context) error {
 		return fmt.Errorf("send fact: %w", err)
 	}
 
-	pollID, msgID, err := r.Sender.SendPoll(ctx, r.ChatID, PollQuestion(), Options())
+	pollID, msgID, err := r.Sender.SendPoll(ctx, r.ChatID, r.Question(), Options())
 	if err != nil {
 		return fmt.Errorf("send poll: %w", err)
 	}
@@ -75,6 +78,9 @@ func (r *Ritual) Run(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
+	if r.OnPosted != nil {
+		r.OnPosted(now)
+	}
 	if factID == 0 {
 		return nil
 	}
@@ -85,7 +91,7 @@ func (r *Ritual) Remind(ctx context.Context) error {
 	if r.Loc == nil {
 		r.Loc = time.UTC
 	}
-	cutoff := time.Now().In(r.Loc).Add(-24 * time.Hour).Format(time.RFC3339)
+	cutoff := time.Now().In(r.Loc).Add(-24*time.Hour + time.Second).Format(time.RFC3339)
 	weeks, err := r.Store.WeeksUnnaggedSince(cutoff)
 	if err != nil {
 		return err
@@ -105,7 +111,8 @@ func (r *Ritual) shame(ctx context.Context, week db.Week, cutoff string) error {
 	}
 	switch {
 	case len(dirty) > 0:
-		if err := r.Sender.SendShame(ctx, week.ChatID, DirtyList(dirty)); err != nil {
+		fileID, caption := r.PickOffense()
+		if err := r.Sender.SendShame(ctx, week.ChatID, fileID, ShameText(caption, dirty)); err != nil {
 			return err
 		}
 	case len(votes) == 0:
@@ -122,6 +129,30 @@ func (r *Ritual) shame(ctx context.Context, week db.Week, cutoff string) error {
 		}
 	}
 	return r.Store.SetSetting("nagged:"+week.WeekID, cutoff)
+}
+
+func (r *Ritual) Question() string {
+	if r.Store != nil {
+		if q, ok, err := r.Store.Setting("poll_question"); err == nil && ok && strings.TrimSpace(q) != "" {
+			return strings.TrimSpace(q)
+		}
+	}
+	return PollQuestion()
+}
+
+func (r *Ritual) PickOffense() (fileID, caption string) {
+	if r.Store == nil {
+		return "", ""
+	}
+	list, err := r.Store.Offenses()
+	if err != nil || len(list) == 0 {
+		return "", ""
+	}
+	n := 0
+	if r.RNG != nil {
+		n = r.RNG.Intn(len(list))
+	}
+	return list[n].FileID, list[n].Caption
 }
 
 func (r *Ritual) Absent(chatID int64, weekID string) ([]string, error) {

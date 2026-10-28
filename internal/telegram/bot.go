@@ -30,8 +30,9 @@ type Bot struct {
 	Store   *db.Store
 	Ritual  *banya.Ritual
 	Sched   Rescheduler
-	pending map[int64]string
-	pendMu  sync.Mutex
+	pending    map[int64]string
+	pendingGif map[int64]string
+	pendMu     sync.Mutex
 }
 
 func New(cfg config.Config, store *db.Store, ritual *banya.Ritual) (*Bot, error) {
@@ -51,6 +52,13 @@ func New(cfg config.Config, store *db.Store, ritual *banya.Ritual) (*Bot, error)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/gryaznuli", bot.MatchTypePrefix, b.onDirty)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/fact", bot.MatchTypePrefix, b.onFact)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, b.onStart)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/offenses", bot.MatchTypePrefix, b.onOffenses)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/offense", bot.MatchTypePrefix, b.onOffense)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/schedule", bot.MatchTypePrefix, b.onSchedule)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/noschedule", bot.MatchTypePrefix, b.onNoSchedule)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/group", bot.MatchTypePrefix, b.onGroup)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/question", bot.MatchTypePrefix, b.onQuestion)
+	b.publishMenu(context.Background())
 	api.RegisterHandler(bot.HandlerTypeCallbackQueryData, "setup:", bot.MatchTypePrefix, b.onSetupCallback)
 	return b, nil
 }
@@ -114,11 +122,14 @@ func photoName(img []byte) string {
 	return "banya.jpg"
 }
 
-func (b *Bot) SendShame(ctx context.Context, chatID int64, text string) error {
+func (b *Bot) SendShame(ctx context.Context, chatID int64, fileID, text string) error {
+	if fileID == "" {
+		fileID = shameGifID
+	}
 	_, err := b.API.SendAnimation(ctx, &bot.SendAnimationParams{
 		ChatID: chatID,
 		Animation: &models.InputFileString{
-			Data: shameGifID,
+			Data: fileID,
 		},
 		Caption: text,
 	})
@@ -265,28 +276,7 @@ func (b *Bot) onDirty(ctx context.Context, api *bot.Bot, update *models.Update) 
 		return
 	}
 	b.remember(b.Cfg.BanyaChatID, msg.From)
-	weekID := db.WeekID(time.Now().In(b.Cfg.Location))
-	names, err := b.Ritual.Absent(b.Cfg.BanyaChatID, weekID)
-	if err != nil {
-		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: msg.Chat.ID,
-			Text:   "Список грязнуль не собрался: " + err.Error(),
-		})
-		return
-	}
-	if len(names) == 0 {
-		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: msg.Chat.ID,
-			Text:   "Все, кого баньщик видел, уже проголосовали. Остальных он не знает.",
-		})
-		return
-	}
-	if err := b.SendShame(ctx, msg.Chat.ID, banya.DirtyList(names)); err != nil {
-		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: msg.Chat.ID,
-			Text:   "Гиф не ушла: " + err.Error(),
-		})
-	}
+	b.fireShame(ctx, api, msg.Chat.ID, b.Cfg.BanyaChatID)
 }
 
 func (b *Bot) onBanya(ctx context.Context, api *bot.Bot, update *models.Update) {

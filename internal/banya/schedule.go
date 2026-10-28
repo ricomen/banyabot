@@ -61,6 +61,15 @@ func ParseSchedule(raw string) (spec, label string, err error) {
 	return spec, label, nil
 }
 
+func ScheduleFrom(dow, hour, minute int) (spec, label string, err error) {
+	if dow < 0 || dow > 6 || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
+		return "", "", fmt.Errorf("такого дня или времени нет")
+	}
+	spec = fmt.Sprintf("%d %d * * %d", minute, hour, dow)
+	label = fmt.Sprintf("%s %02d:%02d", weekdayNames[dow], hour, minute)
+	return spec, label, nil
+}
+
 func parseClock(raw string) (hour, minute int, err error) {
 	parts := strings.Split(raw, ":")
 	if len(parts) != 2 {

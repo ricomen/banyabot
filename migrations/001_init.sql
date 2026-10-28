@@ -35,3 +35,9 @@ CREATE TABLE IF NOT EXISTS members (
   name    TEXT NOT NULL,
   PRIMARY KEY (chat_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS offenses (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_id TEXT NOT NULL,
+  caption TEXT NOT NULL
+);

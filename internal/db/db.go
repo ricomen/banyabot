@@ -143,6 +143,27 @@ func (s *Store) WeeksQuietSince(cutoff string) ([]Week, error) {
 	return out, rows.Err()
 }
 
+func (s *Store) WeeksUnnagged() ([]Week, error) {
+	rows, err := s.SQL.Query(
+		`SELECT w.week_id, w.chat_id, w.poll_id, w.message_id, w.created_at
+		 FROM weeks w
+		 WHERE NOT EXISTS (SELECT 1 FROM settings s WHERE s.key = 'nagged:' || w.week_id)`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Week
+	for rows.Next() {
+		var w Week
+		if err := rows.Scan(&w.WeekID, &w.ChatID, &w.PollID, &w.MessageID, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) WeeksUnnaggedSince(cutoff string) ([]Week, error) {
 	rows, err := s.SQL.Query(
 		`SELECT w.week_id, w.chat_id, w.poll_id, w.message_id, w.created_at
@@ -275,6 +296,59 @@ func (s *Store) Setting(key string) (string, bool, error) {
 		return "", false, err
 	}
 	return value, true, nil
+}
+
+func (s *Store) DeleteSetting(key string) error {
+	_, err := s.SQL.Exec(`DELETE FROM settings WHERE key = ?`, key)
+	return err
+}
+
+type Offense struct {
+	ID      int64
+	FileID  string
+	Caption string
+}
+
+func (s *Store) InsertOffense(fileID, caption string) error {
+	_, err := s.SQL.Exec(`INSERT INTO offenses (file_id, caption) VALUES (?, ?)`, fileID, caption)
+	return err
+}
+
+func (s *Store) Offenses() ([]Offense, error) {
+	rows, err := s.SQL.Query(`SELECT id, file_id, caption FROM offenses ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Offense
+	for rows.Next() {
+		var o Offense
+		if err := rows.Scan(&o.ID, &o.FileID, &o.Caption); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) UpdateOffenseCaption(id int64, caption string) error {
+	res, err := s.SQL.Exec(`UPDATE offenses SET caption = ? WHERE id = ?`, caption, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) DeleteOffense(id int64) error {
+	_, err := s.SQL.Exec(`DELETE FROM offenses WHERE id = ?`, id)
+	return err
 }
 
 func (s *Store) SetSetting(key, value string) error {

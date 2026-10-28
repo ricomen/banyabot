@@ -28,7 +28,7 @@ func (f *fakeSender) SendText(ctx context.Context, chatID int64, text string) er
 	return nil
 }
 
-func (f *fakeSender) SendShame(ctx context.Context, chatID int64, text string) error {
+func (f *fakeSender) SendShame(ctx context.Context, chatID int64, fileID, text string) error {
 	f.shames = append(f.shames, text)
 	return nil
 }
@@ -36,6 +36,12 @@ func (f *fakeSender) SendShame(ctx context.Context, chatID int64, text string) e
 func (f *fakeSender) SendPoll(ctx context.Context, chatID int64, question string, options []string) (string, int, error) {
 	f.polls++
 	return "poll-1", 42, nil
+}
+
+func TestWeekLabel(t *testing.T) {
+	if got := WeekLabel("2026-W44"); got != "26 октября — 1 ноября" {
+		t.Fatalf("%s", got)
+	}
 }
 
 func TestRitualOncePerWeek(t *testing.T) {

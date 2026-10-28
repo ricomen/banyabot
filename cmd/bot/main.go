@@ -54,7 +54,13 @@ func main() {
 		slog.Info("факты из gemini", "model", cfg.GeminiModel)
 	}
 	cronSpec := cfg.CronSpec
-	if spec, ok, err := store.Setting("cron_spec"); err != nil {
+	if off, ok, err := store.Setting("cron_off"); err != nil {
+		slog.Error("settings", "err", err)
+		os.Exit(1)
+	} else if ok && off == "1" {
+		cronSpec = ""
+		cfg.CronSpec = ""
+	} else if spec, ok, err := store.Setting("cron_spec"); err != nil {
 		slog.Error("settings", "err", err)
 		os.Exit(1)
 	} else if ok && spec != "" {
