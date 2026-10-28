@@ -27,7 +27,7 @@ func TestFactCleansText(t *testing.T) {
 	defer srv.Close()
 
 	c := &Client{APIKey: "test-key", Model: "gemini-3.5-flash-lite", URL: srv.URL, HTTP: srv.Client()}
-	text, err := c.Fact(context.Background(), []string{"старый факт"})
+	text, err := c.Fact(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,11 +22,7 @@ CREATE TABLE IF NOT EXISTS facts_used (
   used_at     TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS sent_facts (
-  id      INTEGER PRIMARY KEY AUTOINCREMENT,
-  text    TEXT NOT NULL,
-  used_at TEXT NOT NULL
-);
+DROP TABLE IF EXISTS sent_facts;
 
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,

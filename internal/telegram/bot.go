@@ -79,7 +79,12 @@ func (b *Bot) SendFact(ctx context.Context, chatID int64, text string) error {
 }
 
 func (b *Bot) factPhoto(ctx context.Context, text string) []byte {
-	img, err := (&pictures.Client{}).Find(ctx, text)
+	client := &pictures.Client{}
+	img, err := client.Yandex(ctx, text)
+	if err != nil || len(img) == 0 {
+		slog.Warn("картинка с яндекса не нашлась", "err", err)
+		img, err = client.Find(ctx, text)
+	}
 	if err != nil || len(img) == 0 {
 		slog.Warn("картинка с commons не нашлась", "err", err)
 		return banyaPhoto

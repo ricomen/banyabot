@@ -19,7 +19,7 @@ type PollSender interface {
 }
 
 type FactSource interface {
-	Fact(ctx context.Context, recent []string) (string, error)
+	Fact(ctx context.Context) (string, error)
 }
 
 type Taunter interface {
@@ -74,14 +74,10 @@ func (r *Ritual) Run(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
-	usedAt := now.Format(time.RFC3339)
-	if err := r.Store.SaveSentFact(text, usedAt); err != nil {
-		return err
-	}
 	if factID == 0 {
 		return nil
 	}
-	return r.Store.MarkFactUsed(factID, usedAt)
+	return r.Store.MarkFactUsed(factID, now.Format(time.RFC3339))
 }
 
 func (r *Ritual) Remind(ctx context.Context) error {
@@ -120,23 +116,15 @@ func (r *Ritual) PostFact(ctx context.Context) error {
 	if err := r.Sender.SendFact(ctx, r.ChatID, text); err != nil {
 		return fmt.Errorf("send fact: %w", err)
 	}
-	usedAt := time.Now().In(r.Loc).Format(time.RFC3339)
-	if err := r.Store.SaveSentFact(text, usedAt); err != nil {
-		return err
-	}
 	if factID == 0 {
 		return nil
 	}
-	return r.Store.MarkFactUsed(factID, usedAt)
+	return r.Store.MarkFactUsed(factID, time.Now().In(r.Loc).Format(time.RFC3339))
 }
 
 func (r *Ritual) nextFact(ctx context.Context) (string, int, error) {
 	if r.Source != nil {
-		recent, err := r.Store.RecentFactTexts(12)
-		if err != nil {
-			return "", 0, err
-		}
-		text, err := r.Source.Fact(ctx, recent)
+		text, err := r.Source.Fact(ctx)
 		if err == nil && text != "" {
 			return text, 0, nil
 		}

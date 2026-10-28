@@ -207,37 +207,6 @@ func (s *Store) ClearFactsUsed() error {
 	return err
 }
 
-func (s *Store) RecentFactTexts(limit int) ([]string, error) {
-	rows, err := s.SQL.Query(
-		`SELECT text FROM sent_facts ORDER BY id DESC LIMIT ?`,
-		limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var text string
-		if err := rows.Scan(&text); err != nil {
-			return nil, err
-		}
-		out = append(out, text)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
-		out[i], out[j] = out[j], out[i]
-	}
-	return out, nil
-}
-
-func (s *Store) SaveSentFact(text, usedAt string) error {
-	_, err := s.SQL.Exec(`INSERT INTO sent_facts (text, used_at) VALUES (?, ?)`, text, usedAt)
-	return err
-}
-
 func (s *Store) Setting(key string) (string, bool, error) {
 	var value string
 	err := s.SQL.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&value)

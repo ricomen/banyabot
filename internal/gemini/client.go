@@ -35,16 +35,12 @@ func (c *Client) httpClient() *http.Client {
 	return &http.Client{Timeout: 45 * time.Second}
 }
 
-func (c *Client) Fact(ctx context.Context, recent []string) (string, error) {
-	user := "Дай один новый факт про русскую баню."
-	if len(recent) > 0 {
-		user += " Не повторяй уже отправленное:\n- " + strings.Join(recent, "\n- ")
-	}
+func (c *Client) Fact(ctx context.Context) (string, error) {
 	return c.generate(ctx,
-		"Пишешь один короткий факт про русскую баню для Telegram. "+
-			"Одно или два предложения, разговорный тон злобного баньщика. "+
-			"Без списков, заголовков и ссылок. Не выдумывай точные цифры.",
-		user,
+		"Пишешь один короткий факт про русскую баню для Telegram канала. "+
+			"Одно или два предложения, разговорный тон саркастичный, можно с подъебкой или шутеечкой. "+
+			"Без списков, заголовков и ссылок. Не выдумывай, только точные цифры и данные.",
+		"Дай один новый факт про русскую баню.",
 	)
 }
 
