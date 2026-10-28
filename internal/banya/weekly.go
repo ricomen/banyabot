@@ -16,6 +16,7 @@ type PollSender interface {
 	SendFact(ctx context.Context, chatID int64, text string) error
 	SendPoll(ctx context.Context, chatID int64, question string, options []string) (pollID string, messageID int, err error)
 	SendText(ctx context.Context, chatID int64, text string) error
+	SendShame(ctx context.Context, chatID int64, text string) error
 }
 
 type FactSource interface {
@@ -85,11 +86,29 @@ func (r *Ritual) Remind(ctx context.Context) error {
 		r.Loc = time.UTC
 	}
 	cutoff := time.Now().In(r.Loc).Add(-24 * time.Hour).Format(time.RFC3339)
-	weeks, err := r.Store.WeeksQuietSince(cutoff)
+	weeks, err := r.Store.WeeksUnnaggedSince(cutoff)
 	if err != nil {
 		return err
 	}
 	for _, week := range weeks {
+		if err := r.shame(ctx, week, cutoff); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Ritual) shame(ctx context.Context, week db.Week, cutoff string) error {
+	dirty, votes, err := r.absent(week.ChatID, week.WeekID)
+	if err != nil {
+		return err
+	}
+	switch {
+	case len(dirty) > 0:
+		if err := r.Sender.SendShame(ctx, week.ChatID, DirtyList(dirty)); err != nil {
+			return err
+		}
+	case len(votes) == 0:
 		text := NobodyVoted()
 		if r.Taunt != nil {
 			if line, err := r.Taunt.Taunt(ctx); err == nil && line != "" {
@@ -101,11 +120,36 @@ func (r *Ritual) Remind(ctx context.Context) error {
 		if err := r.Sender.SendText(ctx, week.ChatID, text); err != nil {
 			return err
 		}
-		if err := r.Store.SetSetting("nagged:"+week.WeekID, cutoff); err != nil {
-			return err
-		}
 	}
-	return nil
+	return r.Store.SetSetting("nagged:"+week.WeekID, cutoff)
+}
+
+func (r *Ritual) Absent(chatID int64, weekID string) ([]string, error) {
+	names, _, err := r.absent(chatID, weekID)
+	return names, err
+}
+
+func (r *Ritual) absent(chatID int64, weekID string) ([]string, []db.Vote, error) {
+	members, err := r.Store.Members(chatID)
+	if err != nil {
+		return nil, nil, err
+	}
+	votes, err := r.Store.VotesForWeek(weekID)
+	if err != nil {
+		return nil, nil, err
+	}
+	voted := make(map[int64]struct{}, len(votes))
+	for _, v := range votes {
+		voted[v.UserID] = struct{}{}
+	}
+	var dirty []string
+	for _, m := range members {
+		if _, ok := voted[m.UserID]; ok {
+			continue
+		}
+		dirty = append(dirty, m.Name)
+	}
+	return dirty, votes, nil
 }
 
 func (r *Ritual) PostFact(ctx context.Context) error {

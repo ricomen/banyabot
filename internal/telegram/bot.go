@@ -48,6 +48,7 @@ func New(cfg config.Config, store *db.Store, ritual *banya.Ritual) (*Bot, error)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypePrefix, b.onHelp)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/stats", bot.MatchTypePrefix, b.onStats)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/banya", bot.MatchTypePrefix, b.onBanya)
+	api.RegisterHandler(bot.HandlerTypeMessageText, "/gryaznuli", bot.MatchTypePrefix, b.onDirty)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/fact", bot.MatchTypePrefix, b.onFact)
 	api.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, b.onStart)
 	api.RegisterHandler(bot.HandlerTypeCallbackQueryData, "setup:", bot.MatchTypePrefix, b.onSetupCallback)
@@ -58,11 +59,25 @@ func (b *Bot) Start(ctx context.Context) {
 	b.API.Start(ctx)
 }
 
+const shameGifID = "CgACAgIAAxkBAANIauGPioUwlSrUvbG0P8pX0VD88nsAAsoLAAIVBNFIZUEiJQor21I9BA"
+
 func (b *Bot) defaultHandler(ctx context.Context, api *bot.Bot, update *models.Update) {
 	if update.Message == nil {
 		return
 	}
+	b.remember(update.Message.Chat.ID, update.Message.From)
 	b.handleSetupText(ctx, api, update.Message)
+}
+
+func (b *Bot) remember(chatID int64, user *models.User) {
+	if chatID != b.Cfg.BanyaChatID || user == nil || user.IsBot {
+		return
+	}
+	_ = b.Store.UpsertMember(db.Member{
+		ChatID: chatID,
+		UserID: user.ID,
+		Name:   displayName(user),
+	})
 }
 
 func (b *Bot) SendFact(ctx context.Context, chatID int64, text string) error {
@@ -97,6 +112,17 @@ func photoName(img []byte) string {
 		return "banya.png"
 	}
 	return "banya.jpg"
+}
+
+func (b *Bot) SendShame(ctx context.Context, chatID int64, text string) error {
+	_, err := b.API.SendAnimation(ctx, &bot.SendAnimationParams{
+		ChatID: chatID,
+		Animation: &models.InputFileString{
+			Data: shameGifID,
+		},
+		Caption: text,
+	})
+	return err
 }
 
 func (b *Bot) SendText(ctx context.Context, chatID int64, text string) error {
@@ -139,6 +165,7 @@ func (b *Bot) onPollAnswer(ctx context.Context, api *bot.Bot, update *models.Upd
 	if week.ChatID != b.Cfg.BanyaChatID {
 		return
 	}
+	b.remember(week.ChatID, ans.User)
 	if len(ans.OptionIDs) == 0 {
 		_ = b.Store.DeleteVote(week.WeekID, ans.User.ID)
 		return
@@ -225,6 +252,39 @@ func (b *Bot) onFact(ctx context.Context, api *bot.Bot, update *models.Update) {
 		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: msg.Chat.ID,
 			Text:   "Факт не вышел: " + err.Error(),
+		})
+	}
+}
+
+func (b *Bot) onDirty(ctx context.Context, api *bot.Bot, update *models.Update) {
+	msg := update.Message
+	if msg == nil || msg.From == nil {
+		return
+	}
+	if !b.Cfg.IsAdmin(msg.From.ID) || !b.allowedChat(msg.Chat.ID, msg.From) {
+		return
+	}
+	b.remember(b.Cfg.BanyaChatID, msg.From)
+	weekID := db.WeekID(time.Now().In(b.Cfg.Location))
+	names, err := b.Ritual.Absent(b.Cfg.BanyaChatID, weekID)
+	if err != nil {
+		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: msg.Chat.ID,
+			Text:   "Список грязнуль не собрался: " + err.Error(),
+		})
+		return
+	}
+	if len(names) == 0 {
+		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: msg.Chat.ID,
+			Text:   "Все, кого баньщик видел, уже проголосовали. Остальных он не знает.",
+		})
+		return
+	}
+	if err := b.SendShame(ctx, msg.Chat.ID, banya.DirtyList(names)); err != nil {
+		_, _ = api.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: msg.Chat.ID,
+			Text:   "Гиф не ушла: " + err.Error(),
 		})
 	}
 }

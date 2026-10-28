@@ -84,12 +84,70 @@ func (s *Store) InsertWeek(w Week) error {
 	return err
 }
 
+type Member struct {
+	ChatID int64
+	UserID int64
+	Name   string
+}
+
+func (s *Store) UpsertMember(m Member) error {
+	_, err := s.SQL.Exec(
+		`INSERT INTO members (chat_id, user_id, name) VALUES (?, ?, ?)
+		 ON CONFLICT(chat_id, user_id) DO UPDATE SET name = excluded.name`,
+		m.ChatID, m.UserID, m.Name,
+	)
+	return err
+}
+
+func (s *Store) Members(chatID int64) ([]Member, error) {
+	rows, err := s.SQL.Query(
+		`SELECT chat_id, user_id, name FROM members WHERE chat_id = ? ORDER BY name`,
+		chatID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Member
+	for rows.Next() {
+		var m Member
+		if err := rows.Scan(&m.ChatID, &m.UserID, &m.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) WeeksQuietSince(cutoff string) ([]Week, error) {
 	rows, err := s.SQL.Query(
 		`SELECT w.week_id, w.chat_id, w.poll_id, w.message_id, w.created_at
 		 FROM weeks w
 		 WHERE w.created_at <= ?
 		   AND NOT EXISTS (SELECT 1 FROM votes v WHERE v.week_id = w.week_id)
+		   AND NOT EXISTS (SELECT 1 FROM settings s WHERE s.key = 'nagged:' || w.week_id)`,
+		cutoff,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Week
+	for rows.Next() {
+		var w Week
+		if err := rows.Scan(&w.WeekID, &w.ChatID, &w.PollID, &w.MessageID, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) WeeksUnnaggedSince(cutoff string) ([]Week, error) {
+	rows, err := s.SQL.Query(
+		`SELECT w.week_id, w.chat_id, w.poll_id, w.message_id, w.created_at
+		 FROM weeks w
+		 WHERE w.created_at <= ?
 		   AND NOT EXISTS (SELECT 1 FROM settings s WHERE s.key = 'nagged:' || w.week_id)`,
 		cutoff,
 	)

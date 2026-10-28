@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ type fakeSender struct {
 	facts []string
 	polls int
 	texts []string
+	shames []string
 }
 
 func (f *fakeSender) SendFact(ctx context.Context, chatID int64, text string) error {
@@ -23,6 +25,11 @@ func (f *fakeSender) SendFact(ctx context.Context, chatID int64, text string) er
 
 func (f *fakeSender) SendText(ctx context.Context, chatID int64, text string) error {
 	f.texts = append(f.texts, text)
+	return nil
+}
+
+func (f *fakeSender) SendShame(ctx context.Context, chatID int64, text string) error {
+	f.shames = append(f.shames, text)
 	return nil
 }
 
@@ -150,6 +157,44 @@ func TestRemindShamesEmptyPoll(t *testing.T) {
 	}
 	if len(sender.texts) != 1 {
 		t.Fatalf("reminded twice: %v", sender.texts)
+	}
+}
+
+func TestRemindShamesKnownNonVoters(t *testing.T) {
+	store, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	old := time.Now().UTC().Add(-25 * time.Hour).Format(time.RFC3339)
+	if err := store.InsertWeek(db.Week{
+		WeekID: "2026-W02", ChatID: -100, PollID: "p", MessageID: 1, CreatedAt: old,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertVote(db.Vote{
+		WeekID: "2026-W02", UserID: 1, Username: "@clean", OptionID: 0, OptionText: "Иду", UpdatedAt: old,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []db.Member{
+		{ChatID: -100, UserID: 1, Name: "@clean"},
+		{ChatID: -100, UserID: 2, Name: "@dirty"},
+	} {
+		if err := store.UpsertMember(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sender := &fakeSender{}
+	r := &Ritual{Store: store, Loc: time.UTC, Sender: sender}
+	if err := r.Remind(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(sender.shames) != 1 || len(sender.texts) != 0 {
+		t.Fatalf("shames=%v texts=%v", sender.shames, sender.texts)
+	}
+	if !strings.Contains(sender.shames[0], "@dirty") || strings.Contains(sender.shames[0], "@clean") {
+		t.Fatalf("%s", sender.shames[0])
 	}
 }
 

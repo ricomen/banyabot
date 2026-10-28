@@ -28,3 +28,10 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS members (
+  chat_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  name    TEXT NOT NULL,
+  PRIMARY KEY (chat_id, user_id)
+);
